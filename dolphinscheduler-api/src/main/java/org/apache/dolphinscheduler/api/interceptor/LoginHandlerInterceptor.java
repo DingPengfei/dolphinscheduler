@@ -19,6 +19,7 @@ package org.apache.dolphinscheduler.api.interceptor;
 
 import org.apache.dolphinscheduler.api.enums.Status;
 import org.apache.dolphinscheduler.api.security.Authenticator;
+import org.apache.dolphinscheduler.api.utils.DecodeRequestParams;
 import org.apache.dolphinscheduler.common.Constants;
 import org.apache.dolphinscheduler.common.enums.Flag;
 import org.apache.dolphinscheduler.dao.entity.User;
@@ -27,13 +28,20 @@ import org.apache.dolphinscheduler.dao.mapper.UserMapper;
 import org.apache.commons.httpclient.HttpStatus;
 import org.apache.commons.lang.StringUtils;
 
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.JWTVerifier;
+import com.auth0.jwt.algorithms.Algorithm;
+
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.servlet.HandlerInterceptor;
+
+import java.io.UnsupportedEncodingException;
 
 /**
  * login interceptor, must log in first
@@ -47,19 +55,26 @@ public class LoginHandlerInterceptor implements HandlerInterceptor {
     @Autowired
     private Authenticator authenticator;
 
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
     /**
      * Intercept the execution of a handler. Called after HandlerMapping determined
      *
-     * @param request current HTTP request
+     * @param request  current HTTP request
      * @param response current HTTP response
-     * @param handler chosen handler to execute, for type and/or instance evaluation
+     * @param handler  chosen handler to execute, for type and/or instance evaluation
      * @return boolean true or false
      */
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
 
+        getRedisUserInfo(request);
+
         // get token
         String token = request.getHeader("token");
+//        String token = getJwtToken(request);
+
         User user;
         if (StringUtils.isEmpty(token)) {
             user = authenticator.getAuthUser(request);
@@ -70,7 +85,9 @@ public class LoginHandlerInterceptor implements HandlerInterceptor {
                 return false;
             }
         } else {
+            getRedisUserInfo(request);
             user = userMapper.queryUserByToken(token);
+
             if (user == null) {
                 response.setStatus(HttpStatus.SC_UNAUTHORIZED);
                 logger.info("user token has expired");
@@ -89,4 +106,32 @@ public class LoginHandlerInterceptor implements HandlerInterceptor {
         return true;
     }
 
+    private void getRedisUserInfo(HttpServletRequest request) {
+        String token = getJwtToken(request);
+        if (StringUtils.isNotBlank(token)) {
+            String username = null;
+            try {
+                username = DecodeRequestParams.getParams(request, "accountName");
+            } catch (UnsupportedEncodingException e) {
+                // TODO try catch optimize
+                e.printStackTrace();
+            }
+            String key = "user:" + username;
+            String salt = (String) redisTemplate.opsForValue().get(key);
+            if (null == salt) {
+                logger.info("no record found in redis, please login first");
+                return;
+            }
+            Algorithm algorithm = Algorithm.HMAC256(salt);
+            JWTVerifier verifier = JWT.require(algorithm)
+                    .withSubject(username)
+                    .build();
+            verifier.verify(token);
+        }
+    }
+
+    private String getJwtToken(HttpServletRequest request) {
+        String authInfo = request.getHeader("Authorization");
+        return StringUtils.removeStart(authInfo, "Bearer ");
+    }
 }

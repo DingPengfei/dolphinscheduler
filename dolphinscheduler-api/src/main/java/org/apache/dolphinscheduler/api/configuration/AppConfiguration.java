@@ -26,6 +26,10 @@ import java.util.Locale;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.RedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
@@ -61,6 +65,18 @@ public class AppConfiguration implements WebMvcConfigurer {
         UrlBasedCorsConfigurationSource configSource = new UrlBasedCorsConfigurationSource();
         configSource.registerCorsConfiguration(PATH_PATTERN, config);
         return new CorsFilter(configSource);
+    }
+
+    @Bean
+    public RedisTemplate redisTemplate(RedisConnectionFactory factory){
+        RedisTemplate redisTemplate = new RedisTemplate();
+        RedisSerializer stringSerializer = new StringRedisSerializer();
+        redisTemplate.setConnectionFactory(factory);
+        redisTemplate.setKeySerializer(stringSerializer);
+        redisTemplate.setValueSerializer(stringSerializer);
+        redisTemplate.setHashKeySerializer(stringSerializer);
+        redisTemplate.setHashValueSerializer(stringSerializer);
+        return redisTemplate;
     }
 
     @Bean
@@ -114,6 +130,7 @@ public class AppConfiguration implements WebMvcConfigurer {
         registry.addResourceHandler("swagger-ui.html").addResourceLocations("classpath:/META-INF/resources/");
         registry.addResourceHandler("/webjars/**").addResourceLocations("classpath:/META-INF/resources/webjars/");
         registry.addResourceHandler("/ui/**").addResourceLocations("file:ui/");
+//        registry.addResourceHandler("/ui/**").addResourceLocations("classpath:/ui/");
     }
 
     @Override

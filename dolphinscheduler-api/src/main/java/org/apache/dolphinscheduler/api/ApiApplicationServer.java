@@ -21,8 +21,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.web.servlet.ServletComponentScan;
 import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
+import org.springframework.web.client.RestTemplate;
 
 @SpringBootApplication
 @ServletComponentScan
@@ -34,4 +36,8 @@ public class ApiApplicationServer extends SpringBootServletInitializer {
         SpringApplication.run(ApiApplicationServer.class, args);
     }
 
+    @Bean
+    public RestTemplate getRestTemplate(){
+        return new RestTemplate();
+    }
 }
